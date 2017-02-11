@@ -21,8 +21,8 @@ defmodule Draft.Orchestration.Server do
 	end
 
 	def start_draft(draft_name, num_teams, options) do
-		draft_tuple = {:via, _, _} = Draft.Server.create_draft(draft_name, num_teams, options)
-		GenServer.call(:draft_orchestrator, {:add_draft, draft_tuple})
+		Draft.Lobby.Supervisor.create_draft(draft_name, num_teams, options)
+		GenServer.call(:draft_orchestrator, {:add_draft, Draft.Lobby.via_tuple(draft_name)})
 	end
 
 	def handle_call({:add_draft, draft_tuple}, _from, drafts) do

@@ -2,40 +2,34 @@ defmodule Draft.Team.Supervisor do
 	use Supervisor
 	require Logger
 
-	def start_link(options) do
-		Supervisor.start_link(__MODULE__, options,[])
+	def start_link do
+		Supervisor.start_link(__MODULE__, [], name: __MODULE__)
 	end
 
-	def init(options) do
-		Logger.debug "in #{__MODULE__}.init options is #{inspect options}"
+	def create_team(room_name, team_name) do
+		Supervisor.start_child(__MODULE__, [{team_name, room_name, Draft.Lobby.via_tuple(room_name)}])
+	end
+
+	def init(_) do
+		Logger.debug "in #{__MODULE__}.init"
 		children = [
-			worker(Draft.Team.Server, [options]) 
+			worker(Draft.Team, [], restart: :transient)
 		]
-		supervise children, strategy: :one_for_one
+		supervise children, strategy: :simple_one_for_one
 	end
 end
 
-defmodule Draft.Team.Server do
+defmodule Draft.Team do
 	use GenServer
 	require Logger
 
-	def start_link({team_name, draft_tuple} = options) do
+	def start_link({team_name, draft_name, draft_via} = options) do
 		Logger.debug "in #{__MODULE__}.start_link options is #{inspect options}"
-		GenServer.start_link(__MODULE__, {team_name, draft_tuple}, name: via_tuple(team_name))
+		GenServer.start_link(__MODULE__, {team_name, draft_name, draft_via}, name: via_tuple(draft_name, team_name))
 	end
 
-	def create_team(team_name, draft_tuple) do
-		{:ok, _pid} = Draft.Team.Supervisor.start_link({team_name, draft_tuple})
-		Logger.debug "in #{__MODULE__}.create_team returned ok for #{team_name}"
-		via_tuple(team_name)
-	end
-
-	def get_team_info(team_name) do
-		GenServer.call(via_tuple(team_name), :get_team_name)
-	end
-
-	def via_tuple(league_name) do
-		{:via, :gproc, {:n, :l, {:draft_room, league_name}}}
+	def via_tuple(draft_name, team_name) do
+		{:via, :gproc, {:n, :l, "#{draft_name}-#{team_name}"}}
 	end
 
 	#####
@@ -45,8 +39,8 @@ defmodule Draft.Team.Server do
 		{:reply, team_name, state}
 	end
 
-	def init({team_name, draft_tuple} = options) do
+	def init({team_name, draft_name, draft_via} = options) do
 		Logger.debug "in #{__MODULE__}.init options is #{inspect options}"
-		{:ok, team_name, draft_tuple}
+		{:ok, {team_name, {draft_name, draft_via}}}
 	end
 end

@@ -8,7 +8,9 @@ defmodule Draft do
 
     children = [
       # Define workers and child supervisors to be supervised
-      supervisor(Draft.Orchestration.Supervisor, [])
+      supervisor(Draft.Orchestration.Supervisor, []),
+      supervisor(Draft.Lobby.Supervisor, []),
+      supervisor(Draft.Team.Supervisor, [])
     ]
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
