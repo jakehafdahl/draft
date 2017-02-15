@@ -1,4 +1,4 @@
-defmodule Draft.Orchestration.Supervisor do
+defmodule Draft.Orchestrator.Supervisor do
 	use Supervisor
 
 	def start_link do
@@ -7,13 +7,13 @@ defmodule Draft.Orchestration.Supervisor do
 
 	def init(_) do
 		children = [
-			worker(Draft.Orchestration.Server, [])
+			worker(Draft.Orchestrator, [])
 		]
 		supervise children, strategy: :one_for_one
 	end
 end
 
-defmodule Draft.Orchestration.Server do
+defmodule Draft.Orchestrator do
 	use GenServer
 
 	def start_link do
@@ -21,12 +21,13 @@ defmodule Draft.Orchestration.Server do
 	end
 
 	def start_draft(draft_name, num_teams, options) do
-		Draft.Lobby.Supervisor.create_draft(draft_name, num_teams, options)
-		GenServer.call(:draft_orchestrator, {:add_draft, Draft.Lobby.via_tuple(draft_name)})
+		{:ok, _pid} = Draft.Lobby.create_draft(draft_name, num_teams, options)
+		draft_pid = Draft.Lobby.get_pid(draft_name)
+		GenServer.call(:draft_orchestrator, {:add_draft, draft_name, draft_pid})
 	end
 
-	def handle_call({:add_draft, draft_tuple}, _from, drafts) do
-		{:reply, :ok, [draft_tuple | drafts]}
+	def handle_call({:add_draft, draft_name, draft_pid}, _from, drafts) do
+		{:reply, :ok, [{draft_name, draft_pid} | drafts]}
 	end
 
 	def init(_) do

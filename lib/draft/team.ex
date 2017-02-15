@@ -6,8 +6,8 @@ defmodule Draft.Team.Supervisor do
 		Supervisor.start_link(__MODULE__, [], name: __MODULE__)
 	end
 
-	def create_team(room_name, team_name) do
-		Supervisor.start_child(__MODULE__, [{team_name, room_name, Draft.Lobby.via_tuple(room_name)}])
+	def create_team(team_name, draft_name) do
+		Supervisor.start_child(__MODULE__, [{team_name, draft_name}])
 	end
 
 	def init(_) do
@@ -23,24 +23,40 @@ defmodule Draft.Team do
 	use GenServer
 	require Logger
 
-	def start_link({team_name, draft_name, draft_via} = options) do
-		Logger.debug "in #{__MODULE__}.start_link options is #{inspect options}"
-		GenServer.start_link(__MODULE__, {team_name, draft_name, draft_via}, name: via_tuple(draft_name, team_name))
+	def start_link({team_name, draft_name}) do
+		GenServer.start_link(__MODULE__, {team_name, draft_name}, name: via_tuple(team_name))
 	end
 
-	def via_tuple(draft_name, team_name) do
-		{:via, :gproc, {:n, :l, "#{draft_name}-#{team_name}"}}
+	def get_pid(draft_name) do
+		case Registry.lookup(:registry, {__MODULE__, draft_name}) do
+			[] -> :empty
+			[{ pid, _}] -> pid
+		end
+	end
+
+	defp via_tuple(name) do
+		{:via, Registry, {:registry, {__MODULE__, name}}}
+	end
+
+	def notify_on_clock(team_pid) do
+		GenServer.call(team_pid, :on_clock)
 	end
 
 	#####
 	#	Genserver Callbacks
 
-	def handle_call(:get_team_name, _from, {team_name, _} = state) do
-		{:reply, team_name, state}
+	def init({team_name, draft_name} = options) do
+		Logger.debug "in #{__MODULE__}.init options is #{inspect options}"
+		{:ok, {team_name, draft_name}}
 	end
 
-	def init({team_name, draft_name, draft_via} = options) do
-		Logger.debug "in #{__MODULE__}.init options is #{inspect options}"
-		{:ok, {team_name, {draft_name, draft_via}}}
+	def handle_call(:draft_started, _from, {team_name, _ } = state) do
+		Logger.debug("draft_started recieved for #{team_name}")
+		{:reply, :ok, state}
+	end
+
+	def handle_call(:on_clock, _from, {team_name, _ } = state) do
+		Logger.debug("#{team_name} says: I'm up!")
+		{:reply, :ok, state}
 	end
 end
